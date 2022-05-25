@@ -1,0 +1,23 @@
+[package]
+name = "upvoted_archiver"
+version = "0.1.0"
+authors = ["Chris Cummings <chris@thesogu.com>"]
+edition = "2021"
+
+[dependencies]
+
+
+[dev-dependencies]
+
+
+[lib]
+name = "upvoted_archiver"
+path = "upvoted_archiver/lib/lib.rs"
+
+[[bin]]
+name = "upvoted_archiver"
+path = "upvoted_archiver/cli/main.rs"
+
+[[test]]
+name = "upvoted_archiver"
+path = "upvoted_archiver/test/test.rs"
