@@ -1,0 +1,21 @@
+name: "Test"
+on:
+  push:
+jobs:
+  tests:
+    strategy:
+      matrix:
+        # FIXME nix flake check is broken locally for darwin but seems that
+        # it works otherwise in CI
+        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: cachix/install-nix-action@v17
+    - uses: cachix/cachix-action@v10
+      with:
+        name: upvoted-archiver
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix build
+    - run: nix flake check

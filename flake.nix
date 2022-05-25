@@ -165,7 +165,7 @@
           ];
 
           # Add any extras here
-          buildInputs = with pkgs; [pre-commit];
+          buildInputs = with pkgs; [cachix pre-commit];
           nativeBuildInputs = with toolchain; [
             rustfmt
             rust-analyzer
