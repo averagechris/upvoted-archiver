@@ -5,6 +5,7 @@ authors = ["Chris Cummings <chris@thesogu.com>"]
 edition = "2021"
 
 [dependencies]
+roux = "1.3.11"
 
 
 [dev-dependencies]
