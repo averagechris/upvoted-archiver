@@ -49,7 +49,7 @@
       common = {
         src = ./.;
         buildInputs = with pkgs; [openssl.dev] ++ builtins.attrValues toolchain;
-        nativeBuildInputs = with pkgs; [pkg-config];
+        nativeBuildInputs = with pkgs; [gcc pkg-config];
       };
 
       # Build *just* the cargo dependencies, so we can reuse
@@ -77,7 +77,18 @@
             hooks = {
               alejandra.enable = true;
               statix.enable = true;
-              cargo-check.enable = true;
+              cargo-check = {
+                enable = true;
+                entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
+                  name = "check-cargo-check";
+                  runtimeInputs = upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
+                  text = ''
+                    CARGO_HOME=${cargoArtifacts.cargoVendorDir} \
+                    PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig" \
+                    cargo check --all-targets --profile=test
+                  '';
+                }}/bin/check-cargo-check";
+              };
               rustfmt = {
                 enable = true;
                 entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
@@ -88,14 +99,20 @@
                   text = "cargo fmt";
                 }}/bin/check-rustfmt";
               };
-              clippy = {
-                # TODO FIXME
+              clippy = let
+                clippy-cmd = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
+              in {
+                # FIXME: renable w/ crane using toolchain.cargo and toolchain.rustc
                 enable = false;
                 entry = pkgs.lib.mkForce "${
                   pkgs.writeShellApplication {
                     name = "check-clippy";
-                    runtimeInputs = clippy.nativeBuildInputs;
-                    text = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
+                    runtimeInputs = clippy.buildInputs ++ clippy.nativeBuildInputs ++ upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
+                    text = ''
+                      export CARGO_HOME=${cargoArtifacts.cargoVendorDir}
+                      export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
+                      ${clippy-cmd}
+                    '';
                   }
                 }/bin/check-clippy";
               };
@@ -117,7 +134,7 @@
         drv = upvoted-archiver;
       };
 
-      devShell = with toolchain;
+      devShells.default = with toolchain;
         pkgs.mkShell {
           inherit (self.checks.${system}.pre-commit) shellHook;
           inputsFrom = [upvoted-archiver clippy];
