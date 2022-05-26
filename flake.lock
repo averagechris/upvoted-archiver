@@ -1,5 +1,30 @@
 {
   "nodes": {
+    "crane": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nix-std": "nix-std",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1653190330,
+        "narHash": "sha256-OL+Uyz/DLUdnxa5b+Y3tijM9ZvoLcDexkE8Ijgo+n7I=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "8261aaeb8f47958a4f8c11c375a66e0d9a7e8927",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "fenix": {
       "inputs": {
         "nixpkgs": [
@@ -8,26 +33,42 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1653373690,
-        "narHash": "sha256-tscCedoPZHrIV2OgRaQ8N8UWqQVXgc1W5ryL4X5RB2M=",
+        "lastModified": 1653460119,
+        "narHash": "sha256-tP4mnBaE/2yehchIeRrCueF2NLS1G2XKGKq+q/oG0+o=",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "520c4d4d54bd8614d4493c9c1d3952e32d801096",
+        "rev": "9a49d754de250ad696e49c9ae4ce4561ffe3fc38",
         "type": "github"
       },
       "original": {
         "owner": "nix-community",
         "repo": "fenix",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1650374568,
+        "narHash": "sha256-Z+s0J8/r907g149rllvwhb4pKi8Wam5ij0st8PwAh+E=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "b4a34015c698c7793d592d66adbab377907a2be8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
         "type": "github"
       }
     },
     "flake-utils": {
       "locked": {
-        "lastModified": 1644229661,
-        "narHash": "sha256-1YdnJAsNy69bpcjuoKdOYQX0YxZBiCYZo4Twxerqv7k=",
+        "lastModified": 1652776076,
+        "narHash": "sha256-gzTw/v1vj4dOVbpBSJX4J0DwUR6LIyXo7/SuuTJp1kM=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "3cecb5b042f7f209c56ffd8371b2711a290ec797",
+        "rev": "04c1b180862888302ddfb2e3ad9eaa63afc60cf8",
         "type": "github"
       },
       "original": {
@@ -36,23 +77,18 @@
         "type": "github"
       }
     },
-    "naersk": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
+    "nix-std": {
       "locked": {
-        "lastModified": 1653413650,
-        "narHash": "sha256-wojDHjb+eU80MPH+3HQaK0liUy8EgR95rvmCl24i58Y=",
-        "owner": "nmattia",
-        "repo": "naersk",
-        "rev": "69daaceebe12c070cd5ae69ba38f277bbf033695",
+        "lastModified": 1647625366,
+        "narHash": "sha256-jR4tpiQDs4GNJC6MzfrNyOFIhVH3o203qR+YNB++GYo=",
+        "owner": "chessai",
+        "repo": "nix-std",
+        "rev": "8b8d32582e298da2c15b4c13ca48ba7994ef96df",
         "type": "github"
       },
       "original": {
-        "owner": "nmattia",
-        "repo": "naersk",
+        "owner": "chessai",
+        "repo": "nix-std",
         "type": "github"
       }
     },
@@ -74,7 +110,9 @@
     },
     "pre-commit-hooks": {
       "inputs": {
-        "flake-utils": "flake-utils",
+        "flake-utils": [
+          "flake-utils"
+        ],
         "nixpkgs": [
           "nixpkgs"
         ]
@@ -95,8 +133,9 @@
     },
     "root": {
       "inputs": {
+        "crane": "crane",
         "fenix": "fenix",
-        "naersk": "naersk",
+        "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "pre-commit-hooks": "pre-commit-hooks"
       }
@@ -104,11 +143,11 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1653339329,
-        "narHash": "sha256-PqtUX+gbBjh/+jaEBrRxqV35Vrk4makbacfvbcyEMfE=",
+        "lastModified": 1653426632,
+        "narHash": "sha256-hDUT+zbzU7SOJJr3VoKiDLJLubu7x6ggDfJ2rzYnYxY=",
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "81805d4cfc2bb307d911806dffb6eabf29b623e3",
+        "rev": "d7c147406eff20783abba6ff1fe250ecc44cf800",
         "type": "github"
       },
       "original": {

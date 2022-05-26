@@ -1,239 +1,132 @@
-# this flake was inspired by https://github.com/t1lde/rust-scaffold
-# thanks t1lde 👍!
 {
+  description = "TODO: archive ur upvotes";
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    naersk = {
-      url = "github:nmattia/naersk";
+    flake-utils.url = "github:numtide/flake-utils";
+    crane = {
+      url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
   outputs = {
     self,
+    flake-utils,
     nixpkgs,
-    naersk,
-    fenix,
+    crane,
     pre-commit-hooks,
+    fenix,
     ...
-  }: let
-    supportedSystems = ["x86_64-linux"];
-
-    # Read the current nightly version from a file
-    nightly-version = builtins.readFile ./nightly-version;
-
-    # forall a. (system -> a) -> { system => a }
-    perSystem = nixpkgs.lib.genAttrs supportedSystems;
-
-    # system -> nixpkgs-attrset
-    nixpkgsFor = system: nixpkgs.legacyPackages."${system}";
-
-    # system -> { string => fenix-package }
-    fenix-packagesFor = system: fenix.packages."${system}";
-
-    # An attrset with packages from the current toolchain snapshot
-    # system -> rust-toolchain
-    toolchainFor = system: let
-      fenix-packages = fenix-packagesFor system;
-
-      # The nightly toolchain variant to use.
-      # You can also set this to 'minimal' or 'complete'
-      fenix-toolchain = fenix-packages.default;
-    in {
-      inherit (fenix-toolchain) rustc cargo rustfmt;
-      inherit (fenix-packages) rust-analyzer;
-      inherit (fenix-packages.complete) rust-src;
-    };
-
-    # system -> naersk-lib
-    naersk-libFor = system: let
-      toolchain = toolchainFor system;
-    in
-      naersk.lib."${system}".override {
-        inherit (toolchain) rustc cargo;
+  }:
+    flake-utils.lib.eachSystem [flake-utils.lib.system.x86_64-linux] (system: let
+      pkgs = import nixpkgs {
+        inherit system;
       };
+      inherit (pkgs) lib;
 
-    # Generate the Cargo.lock with 'cargo fetch' so we can provide it to the nix package
-    mkCargoRoot = {
-      toolchain,
-      pkgs,
-      src,
-      name,
-    }:
-      pkgs.stdenv.mkDerivation {
-        src = "${src}/Cargo.toml";
-        name = "${name}-cargo-lock";
-        buildInputs = with toolchain; [cargo rustc src];
-        buildPhase = ''
-          cp $src Cargo.toml
-          cargo fetch
-        '';
-        installPhase = ''
-          mkdir $out
-          cp $src $out/
-          cp Cargo.lock $out/
-        '';
-        phases = ["buildPhase" "installPhase"];
+      toolchain = {
+        inherit (fenix.packages.${system}) rust-analyzer;
+        inherit (fenix.packages.${system}.default) cargo rustc rustfmt;
+        inherit (fenix.packages.${system}.complete) rust-src;
       };
+      craneLib = crane.lib.${system}.overrideScope' (final: prev: {
+        # TODO FIXME
+        # inherit (toolchain) cargo rust-analyzer rust-src rustc rustfmt;
+        inherit (toolchain) rust-analyzer rust-src rustfmt;
+      });
 
-    # Build various derivations relating to the rust project
-    projectFor = system: let
-      inherit (cargo-project.package) name;
-
-      toolchain = toolchainFor system;
-      pkgs = nixpkgsFor system;
-      naersk-lib = naersk-libFor system;
-      cargo-project = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-      cargo-root = mkCargoRoot {
-        inherit toolchain pkgs name;
+      common = {
         src = ./.;
-      };
-    in rec {
-      inherit name;
-
-      # Environment-variables passed to cargo & dependency non-rust builds
-      build-env = {
-        # Any env-variables you may need (or want) for building
-        # LIBCLANG_PATH = "${llvmPackages.libclang}/lib";
-        # PROTOC = "${protobuf}/bin/protoc";
-        # PROTOC_INCLUDE = "${protobuf}/include";
+        buildInputs = with pkgs; [openssl.dev] ++ builtins.attrValues toolchain;
+        nativeBuildInputs = with pkgs; [pkg-config];
       };
 
-      # The compiled output of the project
-      package = naersk-lib.buildPackage (build-env
+      # Build *just* the cargo dependencies, so we can reuse
+      # all of that work (e.g. via cachix) when running in CI
+      cargoArtifacts = craneLib.buildDepsOnly common;
+
+      upvoted-archiver = craneLib.buildPackage (common
         // {
-          inherit (cargo-project.package) version;
-
-          src = ./.;
-          root = cargo-root;
-          pname = name;
-
-          # Project build dependencies
-          # Add non-rust dependencies here
-          buildInputs = with pkgs; [
-            toolchain.rustc
-            toolchain.cargo
-            libiconv
-            # Common C deps
-            # libclang
-            # pkg-config
-            # openssl.dev
-          ];
-
-          # Extra options, see https://github.com/nix-community/naersk
-          doDoc = true; # docs
-          copyLibs = true; # also link compiled library target in nix output
+          inherit cargoArtifacts;
         });
 
-      checks = {
-        inherit package;
-        pre-commit = pre-commit-hooks.lib.${system}.run {
-          src = ./.;
-          hooks = {
-            alejandra.enable = true;
-            statix.enable = true;
-            clippy.enable = false; # 😱 error[E0514]: found crate `std` compiled by an incompatible version of rustc
-            cargo-check.enable = true;
-            hunspell.enable = false; # 😱 Can't open affix or dictionary files for dictionary named "default".
-            rustfmt = {
-              enable = true;
-              entry = with toolchain;
-                pkgs.lib.mkForce "${pkgs.writeShellApplication {
+      clippy = craneLib.cargoClippy (common
+        // {
+          inherit cargoArtifacts;
+          cargoClippyExtraArgs = "-- --deny warnings";
+        });
+    in {
+      checks =
+        {
+          # Build the crate as part of `nix flake check` for convenience
+          inherit upvoted-archiver;
+
+          pre-commit = pre-commit-hooks.lib.${system}.run {
+            inherit (common) src;
+            hooks = {
+              alejandra.enable = true;
+              statix.enable = true;
+              cargo-check.enable = true;
+              rustfmt = {
+                enable = true;
+                entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
                   name = "check-rustfmt";
-                  runtimeInputs = [rustfmt cargo];
-                  text = "cargo-fmt fmt --manifest-path ${./.}/Cargo.toml -- --check --color always";
+                  runtimeInputs =
+                    (craneLib.cargoFmt common)
+                    .nativeBuildInputs;
+                  text = "cargo fmt";
                 }}/bin/check-rustfmt";
+              };
+              clippy = {
+                # TODO FIXME
+                enable = false;
+                entry = pkgs.lib.mkForce "${
+                  pkgs.writeShellApplication {
+                    name = "check-clippy";
+                    runtimeInputs = clippy.nativeBuildInputs;
+                    text = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
+                  }
+                }/bin/check-clippy";
+              };
             };
           };
+        }
+        // lib.optionalAttrs (system == "x86_64-linux") {
+          # NB: cargo-tarpaulin only supports x86_64 systems
+          # Check code coverage (note: this will not upload coverage anywhere)
+          test-coverage = craneLib.cargoTarpaulin (common
+            // {
+              inherit cargoArtifacts;
+            });
         };
+
+      packages.default = upvoted-archiver;
+
+      apps.default = flake-utils.lib.mkApp {
+        drv = upvoted-archiver;
       };
 
-      # A devShell with some extras
-      devShell = pkgs.mkShell (build-env
-        // {
-          # Include the buildInputs from the project
-          inputsFrom = [
-            package
-          ];
+      devShell = with toolchain;
+        pkgs.mkShell {
+          inherit (self.checks.${system}.pre-commit) shellHook;
+          inputsFrom = [upvoted-archiver clippy];
+          buildInputs = with pkgs; [cachix];
+          RUST_ANALYZER_PATH = "${rust-analyzer}";
+          RUST_SRC_PATH = "${rust-src}/lib/rustlib/src/rust/library";
+          CARGO_PATH = "${cargo}/bin/cargo";
+        };
 
-          # Add any extras here
-          buildInputs = with pkgs; [cachix pre-commit];
-          nativeBuildInputs = with toolchain; [
-            rustfmt
-            rust-analyzer
-          ];
-
-          # Extra env variables not used for the build
-          RUST_ANALYZER_PATH = "${toolchain.rust-analyzer}";
-          RUST_SRC_PATH = "${toolchain.rust-src}/lib/rustlib/src/rust/library";
-          CARGO_PATH = "${toolchain.cargo}/bin/cargo";
-
-          # Shell hook defining helper functions & symlinking the generated Cargo.lock
-          shellHook =
-            checks.pre-commit.shellHook
-            + ''
-              link-cargo-lock () {
-                local lock=./Cargo.lock
-                if test -L "$lock"; then
-                  rm "$lock";
-                elif test -e "$lock"; then
-                  echo 'refusing to overwrite existing (non-symlinked) Cargo.lock'
-                  exit 1
-                fi
-                ln -s ${cargo-root}/Cargo.lock "$lock"
-              }
-              update-nightly-version () {
-                local next="$(date -I)"
-                local prev="$(cat ./nightly-version)"
-                echo 'updating nightly version in ./nightly-version: '"$prev -> $next"
-                echo "$next" > ./nightly-version
-              }
-              link-cargo-lock
-            '';
-        });
-    };
-
-    # system -> { string => derivation }
-    packagesFor = system: let
-      project = projectFor system;
-    in {
-      "${project.name}" = project.package;
-      default = project.devShell;
-    };
-
-    packages = perSystem packagesFor;
-
-    # system -> shell-derivation
-    devShellFor = system: let
-      project = projectFor system;
-    in {
-      "${project.name}" = project.devShell;
-      default = project.devShell;
-    };
-  in {
-    inherit packages;
-
-    # For nix repl & downstream
-    toolchain = perSystem toolchainFor;
-    naersk-lib = perSystem naersk-libFor;
-    fenix-packages = perSystem fenix-packagesFor;
-    project = perSystem projectFor;
-
-    # nix flake check
-    checks = perSystem (system: let project = projectFor system; in project.checks);
-
-    # nix develop
-    devShells = perSystem devShellFor;
-
-    # nix fmt
-    formatter = perSystem (system: let pkgs = nixpkgsFor system; in pkgs.alejandra);
-  };
+      formatter = pkgs.alejandra;
+    });
 }
