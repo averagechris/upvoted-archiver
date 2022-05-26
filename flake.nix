@@ -38,32 +38,25 @@
       toolchain = {
         inherit (fenix.packages.${system}) rust-analyzer;
         inherit (fenix.packages.${system}.default) cargo rustc rustfmt;
-        inherit (fenix.packages.${system}.complete) rust-src;
+        inherit (fenix.packages.${system}.complete) clippy rust-src;
       };
       craneLib = crane.lib.${system}.overrideScope' (final: prev: {
-        # TODO FIXME
-        # inherit (toolchain) cargo rust-analyzer rust-src rustc rustfmt;
-        inherit (toolchain) rust-analyzer rust-src rustfmt;
+        inherit (toolchain) cargo clippy rust-analyzer rust-src rustc rustfmt;
       });
 
-      common = {
+      common = rec {
         src = ./.;
         buildInputs = with pkgs; [openssl.dev] ++ builtins.attrValues toolchain;
-        nativeBuildInputs = with pkgs; [gcc pkg-config];
+        nativeBuildInputs = with pkgs; [gcc pkg-config toolchain.rustc];
+        cargoArtifacts = craneLib.buildDepsOnly {
+          inherit src buildInputs nativeBuildInputs;
+        };
       };
 
-      # Build *just* the cargo dependencies, so we can reuse
-      # all of that work (e.g. via cachix) when running in CI
-      cargoArtifacts = craneLib.buildDepsOnly common;
-
-      upvoted-archiver = craneLib.buildPackage (common
-        // {
-          inherit cargoArtifacts;
-        });
+      upvoted-archiver = craneLib.buildPackage common;
 
       clippy = craneLib.cargoClippy (common
         // {
-          inherit cargoArtifacts;
           cargoClippyExtraArgs = "-- --deny warnings";
         });
     in {
@@ -83,7 +76,7 @@
                   name = "check-cargo-check";
                   runtimeInputs = upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
                   text = ''
-                    CARGO_HOME=${cargoArtifacts.cargoVendorDir} \
+                    CARGO_HOME=${common.cargoArtifacts.cargoVendorDir} \
                     PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig" \
                     cargo check --all-targets --profile=test
                   '';
@@ -102,14 +95,13 @@
               clippy = let
                 clippy-cmd = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
               in {
-                # FIXME: renable w/ crane using toolchain.cargo and toolchain.rustc
-                enable = false;
+                enable = true;
                 entry = pkgs.lib.mkForce "${
                   pkgs.writeShellApplication {
                     name = "check-clippy";
                     runtimeInputs = clippy.buildInputs ++ clippy.nativeBuildInputs ++ upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
                     text = ''
-                      export CARGO_HOME=${cargoArtifacts.cargoVendorDir}
+                      export CARGO_HOME=${common.cargoArtifacts.cargoVendorDir}
                       export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
                       ${clippy-cmd}
                     '';
@@ -122,10 +114,7 @@
         // lib.optionalAttrs (system == "x86_64-linux") {
           # NB: cargo-tarpaulin only supports x86_64 systems
           # Check code coverage (note: this will not upload coverage anywhere)
-          test-coverage = craneLib.cargoTarpaulin (common
-            // {
-              inherit cargoArtifacts;
-            });
+          test-coverage = craneLib.cargoTarpaulin common;
         };
 
       packages.default = upvoted-archiver;
