@@ -19,3 +19,12 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix build
     - run: nix flake check
+    - name: "run tests"
+      env:
+        UPVOTED_ARCHIVER_REDDIT_CLIENT_ID: '${{ secrets.REDDIT_CLIENT_ID }}'
+        UPVOTED_ARCHIVER_REDDIT_CLIENT_SECRET: '${{ secrets.REDDIT_CLIENT_SECRET }}'
+        REDDIT_USERNAME: '${{ secrets.REDDIT_USERNAME }}'
+        REDDIT_PASSWORD: '${{ secrets.REDDIT_PASSWORD }}'
+      run: |
+        nix develop
+        cargo test -- --nocapture
