@@ -3,6 +3,7 @@ use async_recursion::async_recursion;
 use futures_core::stream::Stream;
 use roux::util::FeedOption;
 use std::env;
+use std::fmt;
 
 use async_stream::try_stream;
 use roux::me::responses::SavedData;
@@ -11,6 +12,7 @@ use roux::{util::RouxError, Me, Reddit};
 
 type RedditPage = BasicThing<Listing<BasicThing<SavedData>>>;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     client_id: String,
     client_secret: String,
@@ -38,6 +40,7 @@ impl Default for Config {
     }
 }
 
+#[derive(Clone)]
 pub struct RedditCredentials {
     username: String,
     password: String,
@@ -67,6 +70,30 @@ impl RedditCredentials {
     }
 }
 
+impl fmt::Debug for RedditCredentials {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RedditCredentials")
+            .field(
+                "username",
+                &if self.username.is_empty() {
+                    "[omitted]"
+                } else {
+                    "[MISSING]"
+                },
+            )
+            .field(
+                "password",
+                &if self.password.is_empty() {
+                    "[omitted]"
+                } else {
+                    "[MISSING]"
+                },
+            )
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Upvotes<'a> {
     pub credentials: RedditCredentials,
     pub config: &'a Config,
@@ -122,14 +149,14 @@ impl<'a> Upvotes<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpvotedItem {
-    author: String,
-    subreddit: String,
-    html: Option<String>,
-    text: String,
-    url: String,
-    content_url: Option<String>,
+    pub author: String,
+    pub subreddit: String,
+    pub html: Option<String>,
+    pub text: String,
+    pub url: String,
+    pub content_url: Option<String>,
 }
 
 impl From<SavedData> for UpvotedItem {
