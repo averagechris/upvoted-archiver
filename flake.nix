@@ -48,6 +48,9 @@
         src = ./.;
         buildInputs = with pkgs; [openssl.dev] ++ builtins.attrValues toolchain;
         nativeBuildInputs = with pkgs; [gcc pkg-config toolchain.rustc];
+        # disable cargo test as part of `nix flake check`
+        # tests are impure and are run in CI separately
+        checkPhaseCargoCommand = "";
         cargoArtifacts = craneLib.buildDepsOnly {
           inherit src buildInputs nativeBuildInputs;
         };
@@ -60,62 +63,56 @@
           cargoClippyExtraArgs = "-- --deny warnings";
         });
     in {
-      checks =
-        {
-          # Build the crate as part of `nix flake check` for convenience
-          inherit upvoted-archiver;
+      checks = {
+        # Build the crate as part of `nix flake check` for convenience
+        inherit upvoted-archiver;
 
-          pre-commit = pre-commit-hooks.lib.${system}.run {
-            inherit (common) src;
-            hooks = {
-              alejandra.enable = true;
-              statix.enable = true;
-              cargo-check = {
-                enable = true;
-                entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
-                  name = "check-cargo-check";
-                  runtimeInputs = upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
+        pre-commit = pre-commit-hooks.lib.${system}.run {
+          inherit (common) src;
+          hooks = {
+            alejandra.enable = true;
+            statix.enable = true;
+            cargo-check = {
+              enable = true;
+              entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
+                name = "check-cargo-check";
+                runtimeInputs = upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
+                text = ''
+                  CARGO_HOME=${common.cargoArtifacts.cargoVendorDir} \
+                  PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig" \
+                  cargo check --all-targets --profile=test
+                '';
+              }}/bin/check-cargo-check";
+            };
+            rustfmt = {
+              enable = true;
+              entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
+                name = "check-rustfmt";
+                runtimeInputs =
+                  (craneLib.cargoFmt common)
+                  .nativeBuildInputs;
+                text = "cargo fmt";
+              }}/bin/check-rustfmt";
+            };
+            clippy = let
+              clippy-cmd = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
+            in {
+              enable = true;
+              entry = pkgs.lib.mkForce "${
+                pkgs.writeShellApplication {
+                  name = "check-clippy";
+                  runtimeInputs = clippy.buildInputs ++ clippy.nativeBuildInputs ++ upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
                   text = ''
-                    CARGO_HOME=${common.cargoArtifacts.cargoVendorDir} \
-                    PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig" \
-                    cargo check --all-targets --profile=test
+                    export CARGO_HOME=${common.cargoArtifacts.cargoVendorDir}
+                    export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
+                    ${clippy-cmd}
                   '';
-                }}/bin/check-cargo-check";
-              };
-              rustfmt = {
-                enable = true;
-                entry = pkgs.lib.mkForce "${pkgs.writeShellApplication {
-                  name = "check-rustfmt";
-                  runtimeInputs =
-                    (craneLib.cargoFmt common)
-                    .nativeBuildInputs;
-                  text = "cargo fmt";
-                }}/bin/check-rustfmt";
-              };
-              clippy = let
-                clippy-cmd = with pkgs.lib.strings; (removeSuffix "\n\nrunHook postBuild\n" (removePrefix "runHook preBuild\n" clippy.buildPhase));
-              in {
-                enable = true;
-                entry = pkgs.lib.mkForce "${
-                  pkgs.writeShellApplication {
-                    name = "check-clippy";
-                    runtimeInputs = clippy.buildInputs ++ clippy.nativeBuildInputs ++ upvoted-archiver.buildInputs ++ upvoted-archiver.nativeBuildInputs;
-                    text = ''
-                      export CARGO_HOME=${common.cargoArtifacts.cargoVendorDir}
-                      export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
-                      ${clippy-cmd}
-                    '';
-                  }
-                }/bin/check-clippy";
-              };
+                }
+              }/bin/check-clippy";
             };
           };
-        }
-        // lib.optionalAttrs (system == "x86_64-linux") {
-          # NB: cargo-tarpaulin only supports x86_64 systems
-          # Check code coverage (note: this will not upload coverage anywhere)
-          test-coverage = craneLib.cargoTarpaulin common;
         };
+      };
 
       packages.default = upvoted-archiver;
 
