@@ -3,21 +3,29 @@ name = "upvoted_archiver"
 version = "0.1.0"
 authors = ["Chris Cummings <chris@thesogu.com>"]
 edition = "2021"
+readme = "README.md"
+repository = "https://github.com/averagechris/upvoted-archiver"
 
 [dependencies]
+async-recursion = "1.0.0"
+async-stream = "0.3.3"
+futures-core = "0.3.21"
+futures-util = "0.3.21"
 roux = "1.3.11"
+tokio = { version = "1.18.2", features = ["rt-multi-thread", "macros"] }
 
 
 [dev-dependencies]
+tokio-test = "0.4.2"
 
 
 [lib]
 name = "upvoted_archiver"
-path = "upvoted_archiver/lib/lib.rs"
+path = "upvoted_archiver/lib/mod.rs"
 
 [[bin]]
 name = "upvoted_archiver"
-path = "upvoted_archiver/cli/main.rs"
+path = "upvoted_archiver/main.rs"
 
 [[test]]
 name = "upvoted_archiver"
