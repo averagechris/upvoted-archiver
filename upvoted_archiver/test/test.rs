@@ -1,9 +1,61 @@
+#[cfg(test)]
 use futures_util::pin_mut;
 use futures_util::stream::StreamExt;
 use std::env;
 use upvoted_archiver::{Config, RedditCredentials, UpvotedItem, Upvotes};
 
-#[cfg(test)]
+#[test]
+fn reddit_credentials_debug_fmt() {
+    let empty = RedditCredentials {
+        username: "".to_owned(),
+        password: "".to_owned(),
+    };
+
+    let not_empty = RedditCredentials {
+        username: "hello".to_owned(),
+        password: "world".to_owned(),
+    };
+
+    let split_empty = RedditCredentials {
+        username: "hello".to_owned(),
+        password: "".to_owned(),
+    };
+
+    assert_eq!(
+        "RedditCredentials { username: \"[MISSING]\", password: \"[MISSING]\" }",
+        format!("{empty:?}")
+    );
+    assert_eq!(
+        "RedditCredentials { username: \"[omitted]\", password: \"[omitted]\" }",
+        format!("{not_empty:?}")
+    );
+    assert_eq!(
+        "RedditCredentials { username: \"[omitted]\", password: \"[MISSING]\" }",
+        format!("{split_empty:?}")
+    );
+}
+
+#[test]
+fn reddeit_credentials_user_agent() {
+    let creds = RedditCredentials {
+        username: "username".to_owned(),
+        password: "".to_owned(),
+    };
+    let config = Config {
+        client_id: "client_id".to_owned(),
+        client_secret: "client_secret".to_owned(),
+        os_arch: "os_arch",
+        os_name: "os_name",
+        upvoted_archiver_version: "0.0.1",
+        page_size: 100,
+    };
+
+    assert_eq!(
+        "os_arch-os_name:upvoted_archiver:0.0.1 (by /u/username)",
+        creds.user_agent(&config)
+    );
+}
+
 #[tokio::test]
 async fn upvotes_async_stream_yields_upvoted_item() {
     let config = Config::default();

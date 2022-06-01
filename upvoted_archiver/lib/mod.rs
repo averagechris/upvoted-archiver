@@ -14,12 +14,12 @@ type RedditPage = BasicThing<Listing<BasicThing<SavedData>>>;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    client_id: String,
-    client_secret: String,
-    os_arch: &'static str,
-    os_name: &'static str,
-    upvoted_archiver_version: &'static str,
-    page_size: u32,
+    pub client_id: String,
+    pub client_secret: String,
+    pub os_arch: &'static str,
+    pub os_name: &'static str,
+    pub upvoted_archiver_version: &'static str,
+    pub page_size: u32,
 }
 
 impl Default for Config {
@@ -42,8 +42,8 @@ impl Default for Config {
 
 #[derive(Clone)]
 pub struct RedditCredentials {
-    username: String,
-    password: String,
+    pub username: String,
+    pub password: String,
 }
 
 impl RedditCredentials {
@@ -54,19 +54,24 @@ impl RedditCredentials {
         }
     }
 
-    async fn login(&self, config: &Config) -> Result<Me, RouxError> {
+    pub fn user_agent(&self, config: &Config) -> String {
         let arch = config.os_arch;
         let os_name = config.os_name;
         let app_version = config.upvoted_archiver_version;
         let username = &self.username;
-        let user_agent =
-            format!("{arch}-{os_name}:upvoted_archiver:{app_version} (by /u/{username})");
+        format!("{arch}-{os_name}:upvoted_archiver:{app_version} (by /u/{username})")
+    }
 
-        Reddit::new(&user_agent, &config.client_id, &config.client_secret)
-            .username(&self.username)
-            .password(&self.password)
-            .login()
-            .await
+    async fn login(&self, config: &Config) -> Result<Me, RouxError> {
+        Reddit::new(
+            &self.user_agent(config),
+            &config.client_id,
+            &config.client_secret,
+        )
+        .username(&self.username)
+        .password(&self.password)
+        .login()
+        .await
     }
 }
 
@@ -76,17 +81,17 @@ impl fmt::Debug for RedditCredentials {
             .field(
                 "username",
                 &if self.username.is_empty() {
-                    "[omitted]"
-                } else {
                     "[MISSING]"
+                } else {
+                    "[omitted]"
                 },
             )
             .field(
                 "password",
                 &if self.password.is_empty() {
-                    "[omitted]"
-                } else {
                     "[MISSING]"
+                } else {
+                    "[omitted]"
                 },
             )
             .finish()
@@ -129,7 +134,7 @@ impl<'a> Upvotes<'a> {
     }
 
     #[async_recursion]
-    pub async fn fetch_next_page(
+    async fn fetch_next_page(
         &mut self,
         pagination: Option<FeedOption>,
     ) -> Result<RedditPage, RouxError> {
